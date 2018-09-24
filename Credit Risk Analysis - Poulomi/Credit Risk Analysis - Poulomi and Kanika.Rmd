@@ -12,10 +12,9 @@ output:
 
 Author
 --------------
+1. Poulomi Das
 
-1. Kanika Sharma
-
-2. Poulomi Das
+2. Kanika Sharma
 
 Introduction - Project Proposal
 --------------
