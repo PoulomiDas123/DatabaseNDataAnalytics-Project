@@ -1,0 +1,421 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    theme: united
+  html_notebook: default
+  pdf_document: default
+---
+
+Author
+--------------
+
+1. Kanika Sharma
+
+2. Poulomi Das
+
+Introduction - Project Proposal
+--------------
+Credit Risk assessment is a crucial issue faced by Banks nowadays which helps them to evaluate if a loan applicant can be a defaulter at a later stage so that they can go ahead and grant the loan or not. This helps the banks to minimize the possible losses and can increase the volume of credits as banks hold a huge volume of data about customer behavior and it gets difficult to reach to the judgement if an applicant can be a defaulter.
+
+Objectives
+--------------
+Study the dataset available with customer behavior and predict the credit risk after completing the below steps:
+
+a. Conduct Exploratory Data Analysis
+b. Perform Null Handling
+c. Perform Outlier Removal
+d. Study the distribution of the data in different independent fields
+e. Study the relationship between different independent variables
+f. Create a correlation matrix to check for multicollinearity
+g. Create Logistic Regression Model 
+h. Analyze the confusion matrix and check accuracy of prediction
+i. Create the ROC and AUC to confirm the performance of the Prediction
+j. Plot distribution of observed data along with the Predicted Model
+
+Dataset Used
+--------------
+The data set is from a bank where data about customers was collected on a yearly basis for analysis. The data set has 8 variables and 29092 observations. The variables are as follows (loan_status, loan_amnt, int_rate, grade, emp_length, home_ownership, annual_inc, age)
+
+Sneak-peak into the dataset:
+```{r,echo=TRUE}
+library(readr)
+#loan <- readRDS("C:/Users/Priyanshu/Downloads/Loandata.rds")
+loan <- read.csv("/Users/poulomi/Downloads/Loandata.csv", header=TRUE, sep=",")
+head(loan)
+```
+
+Packages Used
+--------------
+a.	readr 
+b.	ggplot2
+c.	gmodels
+d.	corrplot
+e.	pROC
+
+EDA 
+--------------
+After loading the Data into R console, the first step is to look at the data and carry out an exploratory data analysis in order to understand the type of data present. This is also a crucial step since it is here, that we can find out whether the data is normalized and unbiased. 
+EDA is particularly important in order to check for Null values and outliers in our data. Null Values will affect any kind of calculation on the Independent Variables. Outliers can severely influence the result of Regression. 
+
+The below steps have been followed during EDA:
+
+a.	Check the Names of the columns
+```{r,echo=TRUE}
+names(loan)  #returns the names of the columns of the dataset
+```
+
+b.	Check the size of the dataset – i.e., the number of observation
+```{r}
+dim(loan) #returns size of the dataset - number of observation vs number of columns
+```
+
+c. Check the type of data present in the column
+```{r}
+str(loan) #shows the type of data that is present in the different columns
+```
+
+d.	Check the Summary of the data – this returns the below information about the data:
+    i.	Minimum and maximum value
+    ii.	1st and 3rd quartile 
+    iii. Mean, Meadian and NA values
+```{r}
+summary(loan) #shows the summary- min, max, 1st Q, 3rd Q, Mean, median, NA values  
+```
+
+Missing Value
+--------------
+We usually remove the NA values present in our data with either the Median Value or pre-determined default value. Otherwise any computation on the predictors will be affected by the presence of null data. 
+In the above step we found the columns with NA(null) values, we are replacing the NA values with Median Values:
+
+a. As we have seen - there are missing(NA) values in Interest Rate Field
+```{r}
+summary(loan$int_rate)
+na_index <- which(is.na(loan$int_rate))
+
+#Replacing missing values with median
+median_ir <- median(loan$int_rate, na.rm = TRUE)
+loan$int_rate[na_index] <- median_ir
+summary(loan$int_rate)
+```
+
+b. As we have seen - there are missing(NA) values in Emp Length Field
+```{r}
+summary(loan$emp_length)
+na_index_emp <- which(is.na(loan$emp_length))
+
+#Replacing missing values with median
+median_emp <- median(loan$emp_length, na.rm = TRUE)
+loan$emp_length[na_index_emp] <- median_emp
+summary(loan$emp_length)
+```
+
+Analyze the data for every Field
+--------------
+This analysis is done by plotting all the independent variables as shown below: 
+```{r}
+par(mfrow=c(2,3))
+barplot(table(loan$loan_status), main="Loan Status", xlab="Status" , ylab="Count",col=heat.colors(2))
+boxplot(loan$loan_amnt,col = "skyblue", main="Loan amount")
+boxplot(loan$emp_length,col = "orange", main="Loan duration")
+boxplot(loan$int_rate,col = "purple", main="interest rate")
+boxplot(loan$age,col = "magenta", main="age")
+plot(loan$annual_inc, main='annual income', ylab='Annual Inc', col='navyblue')
+```
+
+Observations from the above graphs: 
+
+a.	Bar Graph – Loan Status is a categorical variable with only 2 possible values – 0 and 1, hence has been depicted in a bar graph. 
+
+b.	Box and Whisker Plot – For the fields – Loan Amount, Loan Duration, Interest Rate and Age -  we have used Box and Whisker Plot to study the data and find out if there are any outliers in the data. For ex – there is an outlier in the Field – Age, as depicted clearly in the boxplot, where Age>100.  
+
+c.	Scatter Plot – The annual income is a continuous variable distributed over a large range, hence scatter plot is used to determine the presence of outlier in the data. In our case, there is an outlier in the Annual Income field where the value is approximately 6000000.
+
+Outlier Removal
+--------------
+Outlier removal is crucial for any regression modelling – since the outliers severely affect the regression. 
+In this case, when we study the scatter plot for the column ‘Age’ we came across an outlier value – 144. 
+Hence the outlier can be removed by below method:
+```{r}
+outlier_index <- which(loan$age > 100) 
+loan2 <- loan[-outlier_index,]
+par(mfrow=c(1,2))
+plot(loan$age, main="Before Outlier Removal from Age", ylab="Age", col="skyblue")
+plot(loan2$age, main="After Outlier Removal from Age", ylab="Age", col="navyblue")
+```
+
+However, on further analysis of the entire observation in the dataset, we found that Annual Income also has an outlier (=6000000) where Age=144. Such an outlier is often called Bivariate Outlier. 
+```{r,echo=TRUE}
+plot(loan$age, loan$annual_inc, main="Bivariate Outlier", xlab = "Age", ylab = "Annual Income", col="seagreen" )
+```
+
+So in a collective approach we removed the outlier from Annual Income which in turn removed outlier from Age field. 
+```{r}
+outlier_index_ai <- which(loan$annual_inc == 6000000)
+loan <- loan[-outlier_index_ai, ]
+plot(loan$age, loan$annual_inc, main="Annual Income vs Age",xlab = "Age", ylab = "Annual Income", col="seagreen" )
+```
+
+Distribution of data
+--------------
+a.	Histogram for Interest rate: the histogram below shows the distribution of interest Rates based on frequency, i.e., count of people with the same Interest Rate. 
+
+Observation: In our case, we can conclude that maximum number of people have Interest Rate = 11%
+```{r}
+library(ggplot2)
+#ggplot() + geom_histogram(aes(x = loan$int_rate,fill=int_rate), binwidth=1, alpha=0.5, fill = "red")+geom_col()
+qplot(loan$int_rate, geom="histogram",
+      binwidth = 1,  main ="Histogram for Interest Amount",alpha=0.5, 
+      xlab = "Interest Rate", ylab = "Count", fill=I("blue"), col=I("black"))
+```
+
+
+b.	Histogram for Loan Amount: the histogram below shows the distribution of Loan Amounts based on frequency, i.e., how many people lie in the same Loan Amount band.
+
+Observation: In our case, we can conclude that, most people choose to procure Loan Amount in 5000, 10000, 15000 bands instead of intermediate amount. 
+```{r}
+hist(loan$loan_amnt, main="Histogram for loan amount", xlab="Loan Amount", ylim = c(0,8000),col=heat.colors(3)) 
+```
+
+
+c.	Bar plot to show Loan Grade: The Bar graph shows the count of people who lie in the same Load Grades – A, B, C, D, E, F, G
+
+Observation: In our case, we can conclude that the number of people in different Load Grade decrease from A to G, A being maximum and G being minimum.
+```{r}
+barplot(table(loan$grade),main = "Bar plot to show the loan grades", xlab="Loan Grade", ylim = c(0,10000), ylab="count", col=heat.colors(6))
+```
+
+Study the relationship 
+--------------
+a.	Box plot to illustrate relationship between Loan Grade and Interest rate.
+
+Observation: Below box plot shows that the people with Loan Grade-‘A’, usually have lowest Interest Rate(5%-10%), whereas, Interest Increase from Loan Grade A through G(20%). 
+```{r}
+ggplot(loan,aes(grade,int_rate))+geom_boxplot(aes(fill=grade))+theme(axis.text.x = element_blank()) 
+```
+
+b.	Density graph to show the relationship between Load Grade and Interest Rate.
+
+Observation: The Density Graph is a variation of the histogram that using kernel smoothing to plot values, allowing for smoother distribution by smoothening out the noise. 
+
+For example, The below graph explains for Loan Grade 'G', the median Interest Rate is approximately 20%. 40% people who belong to Loan Grade 'G' are paying Interest Rate= 20%. 
+```{r}
+library(ggplot2)
+ggplot(loan,aes(int_rate,fill=grade))+geom_density()+facet_grid(grade ~ .)
+```
+
+c.	Box plot to depict the relationship between home ownership and Interest Rate.
+
+Observation: The plot below explains that the median Interest Rate for self-owned Homes is less than the Median Interest Rate for Rented homes. 
+```{r}
+library(ggplot2)
+ggplot(loan,aes(home_ownership,int_rate))+geom_boxplot(aes(fill=home_ownership))+theme(axis.text.x = element_blank())
+```
+
+Analysis of the Dependent Variable
+--------------
+The Dependent variable in this case study is the Loan Status. 
+
+a.	In order to understand the percentage of loan defaulter we have used the function - CrossTable(). It helps us find out the count of customers under each Loan Status – 0, 1. It also returns the percent of people with loan status either 0 or 1 with respect to total customers. This is how we conclude that the percentage of loan defaulters are 11%.
+```{r}
+library(gmodels)
+#the Field "Loan Status" marks the defaulters with '1'.
+CrossTable(loan$loan_status) #11% are loan defaulters
+```
+
+b.	The percentage of loan defaulter needs to be analyzed based on the loan Grade also. We use the same function to find out percentage of Loan Defaulter in each Loan Grade. 
+
+Inference: From the below table we can compare the percentage of defaulter in every Loan Grade. For ex, for Loan Grade ‘A’, defaulter is approx. 5%, whereas, for Loan Grade ‘G’, the defaulters are approx. 38%
+```{r}
+#The Loan Status as per Load Grade , shows the %of Defaulters in every Grade.
+CrossTable(loan$grade, loan$loan_status, prop.r = TRUE, 
+           prop.c = F, prop.t = F, prop.chisq = F)
+```
+
+Correlation Matrix
+--------------
+The correlation matrix verifies and validates the collinearity of the dataset. 
+
+a.	A positive correlation indicates that increase in one variable will result in increase in another.
+
+b.	A negative correlation indicates that increase in one variable will result in decrease of another. 
+
+c.	A correlation near zero indicates that as one variable increases, there is no tendency in the other variable to increase or decrease. 
+
+In our case the correlation coefficients are near ‘0’ hence collinearity is not present.
+```{r}
+library(corrplot)
+corr_Matrix<-cor(loan[sapply(loan, function(x) !is.factor(x))])
+corr_Matrix
+corrplot(corr_Matrix, type='upper', method="number", addgrid.col = "gray50", tl.cex=1, tl.col = "black", col = colorRampPalette(c("green","navyblue"))(100))
+```
+
+Logistic Regression
+--------------
+We are using Logistic regression to fit our model. We wish to predict the Loan Status – either 0(loan paid) or 1(defaulter).
+In such a case where the target variable is a categorical variable with only 2 outcomes – such as True/False or Success/Fail, then we go for Logistic Regression. 
+In logistic Regression the log odds of the outcome is modeled as a linear combination of the predictor variables.
+
+As per best practices we have divided Train and Test Data below: 
+
+a. Train data = 2/3rd of the dataset 
+
+b. Test data = 1/3rd of the dataset
+```{r}
+#Data Splitting into train and test data
+
+set.seed(1111)
+
+#Row numbers for training set
+index_train <- sample(1:nrow(loan), 2/3 * nrow(loan)) #2/3 of dataset
+
+loan_train <- loan[index_train, ]
+loan_test <- loan[-index_train, ]
+
+```
+
+We have used Generalized Linear Model[glm() function] to fit the data and it is necessary to specify the family as"Binomial" as we are dealing with categorical variable.
+Logistic Regression uses the logit model which works on the underlying principle:
+$$ \log\left(\frac{p(x)}{1 - p(x)}\right) = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \cdots  + \beta_p x_p $$
+This can be also rearranged as :
+$$p(x) = \frac{1}{1 + e^{-(\beta_0 + \beta_1 x_1 + \beta_2 x_2 + \cdots  + \beta_p x_p)}} = \sigma(\beta_0 + \beta_1 x_1 + \beta_2 x_2 + \cdots  + \beta_p x_p)$$
+A simple interpretiton of the above function with respect to our data set:
+
+1)  x1....xm is used to represent the variables [loan_amnt,grade,age,annual_inc,int_rate]
+
+2)  $\beta_0 ...\beta_p$ are the paramters to be estimated
+
+3)  $\beta_0 + \beta_1 x_1 + \beta_2 x_2 + \cdots  + \beta_p x_p $ is the linear predictor
+
+This is also called the sigmoid function(short hand notation) which is often reffered as the Logistic function
+$$\sigma(x) = \frac{e^x}{1 + e^x} = \frac{1}{1 + e^{-x}}$$
+
+
+```{r}
+lr_loan <- glm(loan_status~ age + int_rate + grade + loan_amnt +
+                 annual_inc, family = "binomial", data = loan_train )
+summary(lr_loan)
+```
+
+Interpretting the results of the model:
+----------------
+1) The first thing we see is the "call"", this simply reminds us the model we ran using glm(), and the options we specified.
+
+2) The deviance residuals, which is a measure of model fit. This part of output shows the distribution of the deviance residuals for individual cases used in the model.
+
+3) The next part of the output shows the coefficients, their standard errors, the z-statistic (sometimes called a Wald z-statistic), and the associated p-values.
+
+4) Both grades and annual_inc are mores statistically significant,as they have three stars compared to the int_rate which has only two stars. The logistic regression coefficients give the change in the log odds of the outcome for a one unit increase in the predictor variable.Intercept is represented by $\beta_0\$ 
+
+5)  a)For every one unit change in age, the log odds of being a defaulter (versus non-admission) is changed by  -0.006 or the log of odds are multiplied by e ^-0.006 i.e it decreases.
+
+
+    b)For a one unit increase in Interest rate, the log odds of being a defaulter increases by 0.05 and so on.
+
+6) The difference between the null deviance and the residual deviance shows how our model is doing against the null model (a model with only the intercept). The wider this gap, the better model performance.
+
+
+
+
+
+
+
+Performance Analysis
+--------------
+After fitting the model in the logistic regression model, we have used the function predict() to predict the target variable, depending on the coefficients from the model we got in the step above. 
+
+1. Inference: 
+
+If the predicted model is above cut-off threshold, then we predict the customer to be a Loan Defaulter(Loan Status=1), otherwise Loan Status=0. 
+
+-------------
+```{r}
+#we are using predict() to predict the target variable depending on the coefficients from the model we got above
+loan_predict <- predict(lr_loan, loan_test, type = "response")
+range(loan_predict,na.rm = T)
+```
+
+2. Confusion Matrix: 
+
+In order to check the accuracy of our predicted model, we derive the confusion matrix, where the horizontal axis is Predicted value and vertical axis is Actual values : 
+
+On analyzing the Confusion Matrix, we reach the below conclusions: 
+
+a.	True Positive - When Predicted and Observed value is ‘0’ 
+
+b.	True Negative - When Predicted and Observed value is ‘1’
+
+In both these cases, our predicted model is correct. 
+
+There are 2 more cases, as below: 
+
+a.	False Positive - When Observed value is 0(loan paid) but predicted value is 1(defaulter) 
+
+b.	False Negative – When Observed value is 1(defaulter) but predicted value is 0(loan paid)
+```{r}
+#If the predicted model is above cut-off threshhold then we prefict Loan Defaulter(Loan Status=1) otherwise Loan Status=0.
+lr_cutoff <- ifelse(loan_predict > 0.35, 1, 0)
+tab_cm <- table(loan_test$loan_status, lr_cutoff)
+tab_cm #returns the confucsion matrix. explain. 
+```
+
+3. Accuracy Calculation:
+
+In order to check the accuracy of the predicted model, the below process is followed: 
+```{r}
+#accuracy calculation - (T.P+T.N)/Full 
+acc_logit <- sum(diag(tab_cm)) / nrow(loan_test)
+acc_logit
+```
+
+Conclusion: The accuracy percentage =89%
+
+4. ROC Logit :
+
+The ROC is a curve generated by plotting the true positive rate (TPR) against the false positive rate (FPR) at various threshold settings while the AUC is the area under the ROC curve. As a rule of thumb, a model with good predictive ability should have an AUC closer to 1 (1 is ideal) than to 0.5.
+```{r}
+library(pROC)
+
+#ROC curve for Logistic Regression
+roc_logit <- roc(loan_test$loan_status, loan_predict)
+
+plot(roc_logit)
+
+auc(roc_logit)  #0.658
+
+```
+
+
+Conclusion
+--------------
+
+1. Scatter plot for Loan Status versus Age based on Home ownership 
+
+Inference: The below plot shows the predicted values for Loan Status (‘0’ or ‘1’) with respect to ‘Age’, as per the Home Ownership (Mortgage, Own, Rent and Others).
+
+```{r}
+library(ggplot2)
+ggplot(loan_test, aes(age, as.numeric(loan_status), color=home_ownership))  +
+geom_point(position=position_jitter(height=0.03, width=0)) +
+xlab("Age") + ylab("Pr (survived)")
+```
+
+
+
+2. Distribution of Observed data across the Predicted model
+
+Inference: The grey area highlighted in the below plot is the distribution of actual/observed Data points, the Line-graph(Blue) shows the predicted model. 
+
+```{r}
+graph <- ggplot(loan_test, aes(x=int_rate, y=loan_status)) +
+    stat_smooth(method="glm",
+                method.args = list(family="binomial"), se=TRUE,
+                fullrange=TRUE) +
+    labs(x="Interest Rate", y="Percentage")+
+    expand_limits(x=20)
+graph
+```
+
